@@ -1,0 +1,31 @@
+version: 0.2
+
+env:
+  variables:
+    APP_NAME: "fitness-website-app"
+    APP_ENV: "prod"
+    ARTIFACT_NAME: "artifact-$CODEBUILD_BUILD_NUMBER.zip"
+  parameter-store:
+    # Optionally reference SSM parameters here, e.g. S3_BUCKET
+    # S3_BUCKET: "/codedeploy/artifacts/bucket"
+phases:
+  install:
+    runtime-versions:
+      runtime: docker
+    commands:
+      - echo "Installing dependencies (none required for static site)"
+      - command -v zip >/dev/null || (yum install -y zip || apt-get update && apt-get install -y zip)
+  pre_build:
+    commands:
+      - echo "Pre-build step at `date`"
+  build:
+    commands:
+      - echo "Zipping project into ${ARTIFACT_NAME}"
+      - zip -r "${ARTIFACT_NAME}" . -x ".git/*" ".github/*" "node_modules/*" "*.zip"
+  post_build:
+    commands:
+      - echo "Build completed at `date`"
+artifacts:
+  files:
+    - ${ARTIFACT_NAME}
+  discard-paths: yes

@@ -1,0 +1,42 @@
+name: CI-CD Deploy (AWS CodeDeploy - EC2)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch: {}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ap-south-1
+      S3_BUCKET: my-codedeploy-artifacts-bucket
+      APP_NAME: fitness-website-app
+      DEPLOY_GRP: fitness-website-deploy-group
+      APP_ENV: prod
+      ARTIFACT: artifact-${{ github.run_number }}.zip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Package artifact
+        run: |
+          zip -r "${ARTIFACT}" . -x ".git/*" ".github/*" "node_modules/*" "*.zip"
+          echo "Created ${ARTIFACT}"
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp "${ARTIFACT}" "s3://${S3_BUCKET}/${APP_NAME}/${APP_ENV}/${ARTIFACT}"
+
+      - name: Create CodeDeploy deployment
+        run: |
+          aws deploy create-deployment                 --application-name "${APP_NAME}"                 --deployment-group-name "${DEPLOY_GRP}"                 --s3-location bucket=${S3_BUCKET},key=${APP_NAME}/${APP_ENV}/${ARTIFACT},bundleType=zip                 --description "GitHub Actions run ${{ github.run_number }}"
